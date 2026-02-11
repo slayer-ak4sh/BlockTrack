@@ -3,8 +3,7 @@ package com.awscapstone.crypto_tracker_backend.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -13,12 +12,6 @@ import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 @Configuration
 public class DynamoDBconfig {
 
-    @Value("${aws.access-key-id}")
-    private String accessKey;
-
-    @Value("${aws.secret-access-key}")
-    private String secretKey;
-
     @Value("${aws.region}")
     private String region;
 
@@ -26,8 +19,7 @@ public class DynamoDBconfig {
     public DynamoDbClient dynamoDbClient(){
         return DynamoDbClient.builder()
                 .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey, secretKey)))
+                .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
     }
 
@@ -42,8 +34,7 @@ public class DynamoDBconfig {
     public CloudWatchClient cloudWatchClient() {
         return CloudWatchClient.builder()
                 .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey, secretKey)))
+                .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
     }
 

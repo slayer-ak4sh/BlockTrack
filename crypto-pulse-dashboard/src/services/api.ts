@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
-const USE_TEST_MODE = true; // Set to false when DynamoDB is configured
+const USE_TEST_MODE = false; // Set to false when DynamoDB is configured
 
 export interface ApiResponse<T> {
   success: boolean;

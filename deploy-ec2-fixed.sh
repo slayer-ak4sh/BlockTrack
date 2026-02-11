@@ -16,7 +16,7 @@ cd ..
 
 echo "=== Starting containers ==="
 docker run -d --name crypto-tracker-backend \
-  -p 8081:8081 \
+  --network host \
   -e AWS_REGION=us-east-1 \
   -e DYNAMODB_USERS_TABLE=Users \
   -e DYNAMODB_MARKET_PRICES_TABLE=MarketPrices \
@@ -30,8 +30,7 @@ sleep 15
 
 echo "=== Starting frontend ==="
 docker run -d --name crypto-tracker-frontend \
-  -p 8080:8080 \
-  --link crypto-tracker-backend:backend \
+  --network host \
   --restart unless-stopped \
   crypto-frontend
 

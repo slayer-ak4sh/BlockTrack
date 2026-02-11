@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -37,19 +41,20 @@ public class CoinGeckoService {
 
     public List<CryptoPrice> fetchCryptoData() {
         try {
-            String url;
-            if (apiKey != null && !apiKey.isEmpty() && !"demo".equals(apiKey)) {
-                url = String.format("%s?vs_currency=%s&order=%s&per_page=%d&page=1&sparkline=true&price_change_percentage=1h,24h,7d&x_cg_demo_api_key=%s",
-                        apiUrl, vsCurrency, order, perPage, apiKey);
+            String url = String.format("%s?vs_currency=%s&order=%s&per_page=%d&page=1&sparkline=true&price_change_percentage=1h,24h,7d",
+                    apiUrl, vsCurrency, order, perPage);
+            
+            HttpHeaders headers = new HttpHeaders();
+            if (apiKey != null && !apiKey.isEmpty() && !apiKey.equals("your-coingecko-api-key")) {
+                headers.set("x-cg-pro-api-key", apiKey);
                 log.info("Fetching data from CoinGecko with API key");
             } else {
-                url = String.format("%s?vs_currency=%s&order=%s&per_page=%d&page=1&sparkline=true&price_change_percentage=1h,24h,7d",
-                        apiUrl, vsCurrency, order, perPage);
-                log.info("Fetching data from CoinGecko: {}", url);
+                log.info("Fetching data from CoinGecko without API key");
             }
-
-            String response = restTemplate.getForObject(url, String.class);
-            JsonNode root = objectMapper.readTree(response);
+            
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+            JsonNode root = objectMapper.readTree(response.getBody());
 
             List<CryptoPrice> cryptoPrices = new ArrayList<>();
 
