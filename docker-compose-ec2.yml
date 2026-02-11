@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./crypto-tracker-backend/crypto-tracker-backend
+      dockerfile: Dockerfile
+    container_name: crypto-tracker-backend
+    ports:
+      - "8081:8081"
+    environment:
+      - AWS_REGION=us-east-1
+      - DYNAMODB_USERS_TABLE=Users
+      - DYNAMODB_MARKET_PRICES_TABLE=MarketPrices
+      - DYNAMODB_WATCHLIST_TABLE=Watchlist
+      - SNS_TOPIC_ARN=arn:aws:sns:us-east-1:149536455348:crypto-topic
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./crypto-pulse-dashboard
+      dockerfile: Dockerfile
+    container_name: crypto-tracker-frontend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    restart: unless-stopped

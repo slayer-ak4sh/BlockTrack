@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./crypto-tracker-backend/crypto-tracker-backend
+      dockerfile: Dockerfile
+    container_name: crypto-tracker-backend
+
+    environment:
+      - AWS_REGION=us-east-1
+      - DYNAMODB_USERS_TABLE=Users
+      - DYNAMODB_MARKET_PRICES_TABLE=MarketPrices
+      - DYNAMODB_WATCHLIST_TABLE=Watchlist
+      - SNS_TOPIC_ARN=arn:aws:sns:us-east-1:149536455348:crypto-topic
+    network_mode: host
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./crypto-pulse-dashboard
+      dockerfile: Dockerfile
+    container_name: crypto-tracker-frontend
+    ports:
+      - "8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

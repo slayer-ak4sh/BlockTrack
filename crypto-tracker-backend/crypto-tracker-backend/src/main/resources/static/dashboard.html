@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f0f23; color: white; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .user-info { display: flex; align-items: center; gap: 1rem; }
+        .logout-btn { background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; }
+        .logout-btn:hover { background: rgba(255,255,255,0.3); }
+        .container { max-width: 1400px; margin: 2rem auto; padding: 0 1rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: #1a1a2e; padding: 1.5rem; border-radius: 10px; border: 1px solid #16213e; }
+        .stat-value { font-size: 2rem; font-weight: bold; color: #4ade80; }
+        .stat-label { color: #94a3b8; font-size: 0.9rem; margin-top: 0.5rem; }
+        .crypto-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1.5rem; }
+        .crypto-card { background: #1a1a2e; padding: 1.5rem; border-radius: 15px; border: 1px solid #16213e; position: relative; overflow: hidden; }
+        .crypto-card:hover { border-color: #667eea; transform: translateY(-2px); transition: all 0.3s ease; }
+        .crypto-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .crypto-info { display: flex; align-items: center; gap: 1rem; }
+        .crypto-icon { width: 40px; height: 40px; border-radius: 50%; }
+        .crypto-name { font-weight: bold; font-size: 1.2rem; }
+        .crypto-symbol { color: #94a3b8; font-size: 0.9rem; }
+        .crypto-price { font-size: 1.8rem; font-weight: bold; color: #fff; }
+        .crypto-change { font-size: 0.9rem; padding: 4px 8px; border-radius: 4px; font-weight: 500; }
+        .positive { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+        .negative { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+        .chart-container { height: 100px; margin: 1rem 0; }
+        .crypto-details { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; font-size: 0.9rem; }
+        .detail-item { color: #94a3b8; }
+        .detail-value { color: #fff; font-weight: 500; }
+        .loading { text-align: center; padding: 4rem; color: #94a3b8; }
+        .loading-spinner { border: 3px solid #1a1a2e; border-top: 3px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .search-bar { background: #1a1a2e; border: 1px solid #16213e; border-radius: 10px; padding: 1rem; margin-bottom: 2rem; }
+        .search-input { background: transparent; border: none; color: white; font-size: 1rem; width: 100%; outline: none; }
+        .search-input::placeholder { color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Crypto Dashboard</h1>
+        <div class="user-info">
+            <span>Welcome, <span id="username"></span>!</span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalMarketCap">$0</div>
+                <div class="stat-label">Total Market Cap</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalVolume">$0</div>
+                <div class="stat-label">24h Volume</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeCoins">0</div>
+                <div class="stat-label">Active Coins</div>
+            </div>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" class="search-input" placeholder="Search cryptocurrencies..." id="searchInput" onkeyup="filterCoins()">
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>Loading cryptocurrency data...</p>
+        </div>
+
+        <div class="crypto-grid" id="cryptoGrid" style="display: none;"></div>
+    </div>
+
+    <script>
+        let allCryptos = [];
+        
+        // Check authentication
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (!user) {
+            window.location.href = 'login.html';
+        } else {
+            document.getElementById('username').textContent = user.username;
+        }
+
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        }
+
+        function formatNumber(num) {
+            if (num >= 1e12) return (num / 1e12).toFixed(2) + 'T';
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+            return num.toFixed(2);
+        }
+
+        function createSparklineChart(canvasId, data, isPositive) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 100);
+            
+            if (isPositive) {
+                gradient.addColorStop(0, 'rgba(74, 222, 128, 0.3)');
+                gradient.addColorStop(1, 'rgba(74, 222, 128, 0.05)');
+            } else {
+                gradient.addColorStop(0, 'rgba(248, 113, 113, 0.3)');
+                gradient.addColorStop(1, 'rgba(248, 113, 113, 0.05)');
+            }
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map((_, i) => i),
+                    datasets: [{
+                        data: data,
+                        borderColor: isPositive ? '#4ade80' : '#f87171',
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    },
+                    elements: { point: { radius: 0 } },
+                    interaction: { intersect: false }
+                }
+            });
+        }
+
+        function displayCryptoData(cryptos) {
+            const grid = document.getElementById('cryptoGrid');
+            grid.innerHTML = '';
+            
+            let totalMarketCap = 0;
+            let totalVolume = 0;
+
+            cryptos.forEach((crypto, index) => {
+                const changeClass = crypto.price_change_percentage_24h >= 0 ? 'positive' : 'negative';
+                const changeSymbol = crypto.price_change_percentage_24h >= 0 ? '+' : '';
+                const canvasId = `chart-${crypto.symbol}-${index}`;
+                
+                totalMarketCap += crypto.market_cap || 0;
+                totalVolume += crypto.total_volume || 0;
+
+                // Generate sparkline data (mock data if not available)
+                let sparklineData = [];
+                if (crypto.sparkline_in_7d && crypto.sparkline_in_7d.price) {
+                    sparklineData = crypto.sparkline_in_7d.price.slice(-20);
+                } else {
+                    // Generate mock sparkline data
+                    const basePrice = crypto.current_price;
+                    const volatility = Math.abs(crypto.price_change_percentage_24h) / 100;
+                    for (let i = 0; i < 20; i++) {
+                        const randomChange = (Math.random() - 0.5) * volatility * basePrice;
+                        sparklineData.push(basePrice + randomChange);
+                    }
+                }
+
+                const card = document.createElement('div');
+                card.className = 'crypto-card';
+                card.innerHTML = `
+                    <div class="crypto-header">
+                        <div class="crypto-info">
+                            <img src="${crypto.image}" alt="${crypto.name}" class="crypto-icon" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiM2NjdlZWEiLz4KPHRleHQgeD0iMjAiIHk9IjI1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIxMiI+JDwvdGV4dD4KPC9zdmc+'">
+                            <div>
+                                <div class="crypto-name">${crypto.name}</div>
+                                <div class="crypto-symbol">${crypto.symbol.toUpperCase()}</div>
+                            </div>
+                        </div>
+                        <div class="crypto-change ${changeClass}">
+                            ${changeSymbol}${crypto.price_change_percentage_24h.toFixed(2)}%
+                        </div>
+                    </div>
+                    
+                    <div class="crypto-price">$${crypto.current_price.toLocaleString()}</div>
+                    
+                    <div class="chart-container">
+                        <canvas id="${canvasId}"></canvas>
+                    </div>
+                    
+                    <div class="crypto-details">
+                        <div class="detail-item">
+                            <div class="detail-value">$${formatNumber(crypto.market_cap)}</div>
+                            <div>Market Cap</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-value">$${formatNumber(crypto.total_volume)}</div>
+                            <div>Volume 24h</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-value">#${crypto.market_cap_rank}</div>
+                            <div>Rank</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-value">${changeSymbol}${crypto.price_change_percentage_7d?.toFixed(2) || '0.00'}%</div>
+                            <div>7d Change</div>
+                        </div>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+                
+                // Create sparkline chart after DOM element is added
+                setTimeout(() => {
+                    createSparklineChart(canvasId, sparklineData, crypto.price_change_percentage_24h >= 0);
+                }, 100);
+            });
+
+            // Update stats
+            document.getElementById('totalMarketCap').textContent = '$' + formatNumber(totalMarketCap);
+            document.getElementById('totalVolume').textContent = '$' + formatNumber(totalVolume);
+            document.getElementById('activeCoins').textContent = cryptos.length;
+        }
+
+        function filterCoins() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filteredCryptos = allCryptos.filter(crypto => 
+                crypto.name.toLowerCase().includes(searchTerm) || 
+                crypto.symbol.toLowerCase().includes(searchTerm)
+            );
+            displayCryptoData(filteredCryptos);
+        }
+
+        // Fetch and display crypto data
+        async function loadCryptoData() {
+            try {
+                const response = await fetch('/api/crypto/prices');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data || data.length === 0) {
+                    document.getElementById('loading').innerHTML = '<div class="loading-spinner"></div><p>No data available. Retrying in 5 seconds...</p>';
+                    setTimeout(loadCryptoData, 5000);
+                    return;
+                }
+                
+                allCryptos = data;
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('cryptoGrid').style.display = 'grid';
+                
+                displayCryptoData(data);
+            } catch (error) {
+                console.error('Error loading crypto data:', error);
+                document.getElementById('loading').innerHTML = '<div class="loading-spinner"></div><p>Error loading data. Retrying in 5 seconds...</p>';
+                setTimeout(loadCryptoData, 5000);
+            }
+        }
+
+        // Load data on page load
+        loadCryptoData();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadCryptoData, 30000);
+    </script>
+</body>
+</html>

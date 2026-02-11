@@ -1,0 +1,10 @@
+branch-defaults:
+  main:
+    environment: crypto-tracker-prod
+global:
+  application_name: crypto-tracker-backend
+  default_platform: Java 21 running on 64bit Amazon Linux 2023
+  default_region: us-east-1
+  sc: git
+deploy:
+  artifact: target/crypto-tracker-backend-0.0.1-SNAPSHOT.jar
